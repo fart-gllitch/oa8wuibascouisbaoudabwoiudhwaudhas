@@ -237,131 +237,108 @@ end</div>
             { name: 'utils.lua', content: '-- Utility functions\nfunction util()\n    return true\nend' }
         ];
 
-        function addNewFile() {
+        function createNewFile() {
             const fileName = prompt("Enter file name (include .lua extension):");
-            if (fileName) {
-                const newFile = {
-                    name: fileName,
-                    content: '-- New Lua File\n'
-                };
-                openFiles.push(newFile);
-                updateFileExplorer();
-                updateEditorTabs();
+            if (fileName && fileName.endsWith('.lua')) {
+                // Send message to Python backend to create file
+                window.pywebview.api.create_file(fileName)
+                    .then(response => {
+                        if (response.success) {
+                            const newFile = {
+                                name: fileName,
+                                content: '-- New Lua File\n'
+                            };
+                            openFiles.push(newFile);
+                            updateFileExplorer();
+                            updateEditorTabs();
+                            // Optionally select the new file
+                            selectNewlyCreatedFile(fileName);
+                        } else {
+                            alert(`Failed to create file: ${response.error}`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error creating file:', error);
+                        alert('Failed to create file');
+                    });
+            } else {
+                alert('Please enter a valid .lua filename');
             }
         }
 
-        function addNewFolder() {
+        function createNewFolder() {
             const folderName = prompt("Enter folder name:");
             if (folderName) {
-                alert('Folder creation is a placeholder feature');
+                // Send message to Python backend to create folder
+                window.pywebview.api.create_folder(folderName)
+                    .then(response => {
+                        if (response.success) {
+                            alert(`Folder "${folderName}" created successfully`);
+                            // Optionally refresh file explorer
+                            updateFileExplorer();
+                        } else {
+                            alert(`Failed to create folder: ${response.error}`);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error creating folder:', error);
+                        alert('Failed to create folder');
+                    });
             }
+        }
+
+        function selectNewlyCreatedFile(fileName) {
+            // Find the newly created file in the file explorer
+            const fileElements = document.querySelectorAll('.file-item');
+            fileElements.forEach(el => {
+                if (el.querySelector('span').textContent.includes(fileName)) {
+                    selectFile(el);
+                }
+            });
         }
 
         function updateFileExplorer() {
-            const explorer = document.getElementById('file-explorer');
-            explorer.innerHTML = openFiles.map(file => `
-                <div class="file-item" onclick="selectFile(this)" data-filename="${file.name}">
-                    <span>📄 ${file.name}</span>
-                    <span class="file-item-actions">✕</span>
-                </div>
-            `).join('');
+            // Retrieve file list from Python backend
+            window.pywebview.api.list_files()
+                .then(files => {
+                    const explorer = document.getElementById('file-explorer');
+                    explorer.innerHTML = files.map(file => `
+                        <div class="file-item" onclick="selectFile(this)" data-filename="${file}">
+                            <span>📄 ${file}</span>
+                            <span class="file-item-actions">✕</span>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    console.error('Error listing files:', error);
+                });
         }
-
-        function updateEditorTabs() {
-            const tabContainer = document.getElementById('editor-tabs');
-            tabContainer.innerHTML = openFiles.map((file, index) => `
-                <div class="editor-tab ${index === 0 ? 'active' : ''}" onclick="switchTab(this)" data-filename="${file.name}">
-                    📄 ${file.name}
-                    <span class="editor-tab-close">✕</span>
-                </div>
-            `).join('');
-        }
-
-        // Improved Enter Key Handling
-        editor.commands.addCommand({
-            name: 'smartEnter',
-            bindKey: {win: 'Enter', mac: 'Enter'},
-            exec: function(editor) {
-                const session = editor.session;
-                const pos = editor.getCursorPosition();
-                const line = session.getLine(pos.row);
-                const trimmedLine = line.trim();
-
-                // Define auto-complete patterns with local function support
-                const autoCompletePatterns = [
-                    {
-                        start: /^local\s+function\s+\w+$/, 
-                        transform: (match) => match + '()', 
-                        end: 'end'
-                    },
-                    {
-                        start: /^function\s+\w+$/, 
-                        transform: (match) => match + '()', 
-                        end: 'end'
-                    },
-                    {
-                        start: /^if\s+.*\s+then\s*$/, 
-                        transform: null, 
-                        end: 'end'
-                    },
-                    {
-                        start: /^for\s+.*\s+do\s*$/, 
-                        transform: null, 
-                        end: 'end'
-                    },
-                    {
-                        start: /^while\s+.*\s+do\s*$/, 
-                        transform: null, 
-                        end: 'end'
-                    }
-                ];
-
-                // Detect current indentation
-                const currentIndent = line.match(/^\s*/)[0];
-                
-                // Check if line matches any special block
-                const matchedPattern = autoCompletePatterns.find(pattern => 
-                    new RegExp(pattern.start).test(trimmedLine)
-                );
-
-                if (matchedPattern) {
-                    // Transform line if needed (for function definitions)
-                    let processedLine = trimmedLine;
-                    if (matchedPattern.transform) {
-                        processedLine = matchedPattern.transform(trimmedLine);
-                        editor.navigateLineEnd();
-                        editor.insert('()');
-                    }
-
-                    // If it's a special block, insert new line with 'end'
-                    editor.insert('\n' + currentIndent + '    \n' + currentIndent + matchedPattern.end);
-                    editor.navigateUp(1);
-                    editor.navigateLineEnd();
-                } else {
-                    // Normal enter behavior
-                    editor.insert('\n' + currentIndent);
-                }
-            }
-        });
 
         function selectFile(fileElement) {
             const fileName = fileElement.dataset.filename;
-            const file = openFiles.find(f => f.name === fileName);
             
-            // Update file explorer
-            document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-            fileElement.classList.add('active');
-            
-            // Update editor content
-            editor.setValue(file.content, -1);
-            
-            // Update tabs
-            document.querySelectorAll('.editor-tab').forEach(el => {
-                el.classList.remove('active');
-                if (el.dataset.filename === fileName) {
-                    el.classList.add('active');
-                }
-            });
+            // Retrieve file content from Python backend
+            window.pywebview.api.read_file(fileName)
+                .then(fileContent => {
+                    // Update file explorer
+                    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+                    fileElement.classList.add('active');
+                    
+                    // Update editor content
+                    editor.setValue(fileContent, -1);
+                    
+                    // Update tabs
+                    document.querySelectorAll('.editor-tab').forEach(el => {
+                        el.classList.remove('active');
+                        if (el.dataset.filename === fileName) {
+                            el.classList.add('active');
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Error reading file:', error);
+                    alert(`Failed to read file: ${fileName}`);
+                });
         }
 
         function switchTab(tabElement) {
