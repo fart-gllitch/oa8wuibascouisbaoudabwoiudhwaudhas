@@ -231,134 +231,139 @@ end</div>
         });
         editor.session.setMode("ace/mode/lua");
 
-        // File and Tab Management
-        let openFiles = [
-            { name: 'main.lua', content: '-- Welcome to main.lua\nfunction main()\n    print("Hello, World!")\nend' },
-            { name: 'utils.lua', content: '-- Utility functions\nfunction util()\n    return true\nend' }
-        ];
+        // File Management State
+        let currentFiles = [];
+        let activeFile = null;
+
+        // Utility Functions
+        function showOutput(message, isError = false) {
+            const outputElement = document.getElementById('output');
+            outputElement.textContent = message;
+            outputElement.style.color = isError ? 'red' : '#777';
+        }
+
+        function updateFileExplorer() {
+            // Call Python backend to list files
+            window.pywebview.api.list_files()
+                .then(files => {
+                    currentFiles = files;
+                    const explorer = document.getElementById('file-explorer');
+                    explorer.innerHTML = files.map(file => `
+                        <div class="file-item" onclick="selectFile('${file}')">
+                            <span>📄 ${file}</span>
+                            <span class="file-item-actions" onclick="deleteFile('${file}')">✕</span>
+                        </div>
+                    `).join('');
+                })
+                .catch(error => {
+                    showOutput(`Error listing files: ${error}`, true);
+                });
+        }
 
         function createNewFile() {
             const fileName = prompt("Enter file name (include .lua extension):");
             if (fileName && fileName.endsWith('.lua')) {
-                // Send message to Python backend to create file
                 window.pywebview.api.create_file(fileName)
                     .then(response => {
                         if (response.success) {
-                            const newFile = {
-                                name: fileName,
-                                content: '-- New Lua File\n'
-                            };
-                            openFiles.push(newFile);
+                            showOutput(`File ${fileName} created successfully`);
                             updateFileExplorer();
-                            updateEditorTabs();
-                            // Optionally select the new file
-                            selectNewlyCreatedFile(fileName);
+                            selectFile(fileName);
                         } else {
-                            alert(`Failed to create file: ${response.error}`);
+                            showOutput(`Failed to create file: ${response.error}`, true);
                         }
                     })
                     .catch(error => {
-                        console.error('Error creating file:', error);
-                        alert('either created or im broken');
+                        showOutput(`Error creating file: ${error}`, true);
                     });
             } else {
-                alert('Please enter a valid .lua filename');
+                showOutput('Please enter a valid .lua filename', true);
             }
+        }
+
+        function selectFile(fileName) {
+            // Read file content from Python backend
+            window.pywebview.api.read_file(fileName)
+                .then(fileContent => {
+                    // Update editor
+                    editor.setValue(fileContent, -1);
+                    activeFile = fileName;
+
+                    // Update file explorer and tab highlighting
+                    document.querySelectorAll('.file-item').forEach(el => {
+                        el.classList.remove('active');
+                        if (el.textContent.includes(fileName)) {
+                            el.classList.add('active');
+                        }
+                    });
+
+                    showOutput(`Loaded file: ${fileName}`);
+                })
+                .catch(error => {
+                    showOutput(`Error reading file: ${error}`, true);
+                });
+        }
+
+        function saveFile() {
+            if (!activeFile) {
+                showOutput('No file selected', true);
+                return;
+            }
+
+            const content = editor.getValue();
+            // Note: You'll need to add a save_file method to your Python WebAPI
+            window.pywebview.api.save_file(activeFile, content)
+                .then(response => {
+                    if (response.success) {
+                        showOutput(`File ${activeFile} saved successfully`);
+                    } else {
+                        showOutput(`Failed to save file: ${response.error}`, true);
+                    }
+                })
+                .catch(error => {
+                    showOutput(`Error saving file: ${error}`, true);
+                });
         }
 
         function createNewFolder() {
             const folderName = prompt("Enter folder name:");
             if (folderName) {
-                // Send message to Python backend to create folder
                 window.pywebview.api.create_folder(folderName)
                     .then(response => {
                         if (response.success) {
-                            alert(`Folder "${folderName}" created successfully`);
-                            // Optionally refresh file explorer
+                            showOutput(`Folder ${folderName} created successfully`);
                             updateFileExplorer();
                         } else {
-                            alert(`Failed to create folder: ${response.error}`);
+                            showOutput(`Failed to create folder: ${response.error}`, true);
                         }
                     })
                     .catch(error => {
-                        console.error('Error creating folder:', error);
-                        alert('Failed to create folder');
+                        showOutput(`Error creating folder: ${error}`, true);
                     });
             }
         }
 
-        function selectNewlyCreatedFile(fileName) {
-            // Find the newly created file in the file explorer
-            const fileElements = document.querySelectorAll('.file-item');
-            fileElements.forEach(el => {
-                if (el.querySelector('span').textContent.includes(fileName)) {
-                    selectFile(el);
-                }
-            });
-        }
-
-        function updateFileExplorer() {
-            // Retrieve file list from Python backend
-            window.pywebview.api.list_files()
-                .then(files => {
-                    const explorer = document.getElementById('file-explorer');
-                    explorer.innerHTML = files.map(file => `
-                        <div class="file-item" onclick="selectFile(this)" data-filename="${file}">
-                            <span>📄 ${file}</span>
-                            <span class="file-item-actions">✕</span>
-                        </div>
-                    `).join('');
-                })
-                .catch(error => {
-                    console.error('Error listing files:', error);
-                });
-        }
-
-        function selectFile(fileElement) {
-            const fileName = fileElement.dataset.filename;
-            
-            // Retrieve file content from Python backend
-            window.pywebview.api.read_file(fileName)
-                .then(fileContent => {
-                    // Update file explorer
-                    document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
-                    fileElement.classList.add('active');
-                    
-                    // Update editor content
-                    editor.setValue(fileContent, -1);
-                    
-                    // Update tabs
-                    document.querySelectorAll('.editor-tab').forEach(el => {
-                        el.classList.remove('active');
-                        if (el.dataset.filename === fileName) {
-                            el.classList.add('active');
+        function deleteFile(fileName) {
+            if (confirm(`Are you sure you want to delete ${fileName}?`)) {
+                // Note: You'll need to add a delete_file method to your Python WebAPI
+                window.pywebview.api.delete_file(fileName)
+                    .then(response => {
+                        if (response.success) {
+                            showOutput(`File ${fileName} deleted successfully`);
+                            updateFileExplorer();
+                            // Reset editor if current file was deleted
+                            if (activeFile === fileName) {
+                                editor.setValue('', -1);
+                                activeFile = null;
+                            }
+                        } else {
+                            showOutput(`Failed to delete file: ${response.error}`, true);
                         }
+                    })
+                    .catch(error => {
+                        showOutput(`Error deleting file: ${error}`, true);
                     });
-                })
-                .catch(error => {
-                    console.error('Error reading file:', error);
-                    alert(`Failed to read file: ${fileName}`);
-                });
-        }
-
-        function switchTab(tabElement) {
-            const fileName = tabElement.dataset.filename;
-            const file = openFiles.find(f => f.name === fileName);
-            
-            // Update tabs
-            document.querySelectorAll('.editor-tab').forEach(el => el.classList.remove('active'));
-            tabElement.classList.add('active');
-            
-            // Update editor content
-            editor.setValue(file.content, -1);
-            
-            // Update file explorer
-            document.querySelectorAll('.file-item').forEach(el => {
-                el.classList.remove('active');
-                if (el.dataset.filename === fileName) {
-                    el.classList.add('active');
-                }
-            });
+            }
         }
 
         // Improved Enter Key Handling
