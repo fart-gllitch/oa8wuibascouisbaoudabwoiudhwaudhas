@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Exploris.lol Scripting</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ext-language_tools.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            scrollbar-width: thin;
+            scrollbar-color: #333 #1a1a1a;
+        }
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 4px;
+        }
+        body {
+            font-family: 'Inter', 'Arial', sans-serif;
+            background-color: #0d0d0d;
+            color: #b0b0b0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .titlebar {
+            background-color: #111;
+            color: #666;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            border-bottom: 1px solid #222;
+        }
+        .main-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #111;
+            border-right: 1px solid #222;
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #0e0e0e;
+            border-bottom: 1px solid #222;
+        }
+        .file-explorer {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px;
+            color: #777;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+        .file-item:hover {
+            background-color: #1a1a1a;
+        }
+        .file-item.active {
+            background-color: #1f1f1f;
+            color: #b0b0b0;
+        }
+        .editor-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-tabs {
+            background-color: #0e0e0e;
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #222;
+        }
+        .editor-tab {
+            padding: 8px 12px;
+            color: #555;
+            cursor: pointer;
+            border-right: 1px solid #222;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .editor-tab.active {
+            background-color: #1a1a1a;
+            color: #b0b0b0;
+        }
+        .editor-tab-close {
+            color: #555;
+            margin-left: 5px;
+        }
+        #editor {
+            flex-grow: 1;
+            background-color: #0d0d0d !important;
+        }
+        .bottom-bar {
+            background-color: #111;
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            border-top: 1px solid #222;
+        }
+        .bottom-controls {
+            display: flex;
+            gap: 8px;
+        }
+        .button {
+            background-color: #1a1a1a;
+            color: #777;
+            border: 1px solid #222;
+            padding: 4px 8px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+        }
+        .button:hover {
+            background-color: #222;
+            color: #999;
+        }
+        .output {
+            background-color: #0e0e0e;
+            color: #777;
+            height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            border-top: 1px solid #222;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+        }
+        .sidebar-actions {
+            display: flex;
+            gap: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="titlebar">
+        Exploris.lol | <span style="color: #444;">▼</span> | <span style="color: #444;">×</span>
+    </div>
+    <div class="main-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <span>Workspace</span>
+                <div class="sidebar-actions">
+                    <button class="button" style="padding: 2px 5px;" onclick="addNewFile()">+</button>
+                    <button class="button" style="padding: 2px 5px;" onclick="addNewFolder()">📁</button>
+                </div>
+            </div>
+            <div class="file-explorer" id="file-explorer">
+                <div class="file-item" onclick="selectFile(this)">
+                    <span>📄 main.lua</span>
+                    <span class="file-item-actions">✕</span>
+                </div>
+                <div class="file-item" onclick="selectFile(this)">
+                    <span>📄 utils.lua</span>
+                    <span class="file-item-actions">✕</span>
+                </div>
+            </div>
+        </div>
+        <div class="editor-container">
+            <div class="editor-tabs" id="editor-tabs">
+                <div class="editor-tab active" onclick="switchTab(this)">
+                    📄 main.lua
+                    <span class="editor-tab-close">✕</span>
+                </div>
+                <div class="editor-tab" onclick="switchTab(this)">
+                    📄 utils.lua
+                    <span class="editor-tab-close">✕</span>
+                </div>
+            </div>
+            <div id="editor">-- Welcome to Exploris.lol Lua Workspace
+-- Start coding your Lua script here
+
+function main()
+    print("Hello, Exploris.lol!")
+end</div>
+        </div>
+    </div>
+    <div class="bottom-bar">
+        <div class="bottom-controls">
+            <button class="button">Execute</button>
+            <button class="button">Clear</button>
+            <button class="button">Open</button>
+            <button class="button">Execute</button>
+            <button class="button">Save</button>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="button">🚀</button>
+            <button class="button">🔗</button>
+        </div>
+    </div>
+    <div class="output" id="output">
+        Output
+    </div>
+
+    <script>
+        // Ace Editor Setup
+        ace.require("ace/ext/language_tools");
+        var editor = ace.edit("editor");
+        
+        editor.setOptions({
+            enableBasicAutocompletion: true,
+            enableSnippets: true,
+            enableLiveAutocompletion: true,
+            theme: 'ace/theme/tomorrow_night_eighties'
+        });
+        editor.session.setMode("ace/mode/lua");
+
+        // File and Tab Management
+        let openFiles = [
+            { name: 'main.lua', content: '-- Welcome to main.lua\nfunction main()\n    print("Hello, World!")\nend' },
+            { name: 'utils.lua', content: '-- Utility functions\nfunction util()\n    return true\nend' }
+        ];
+
+        function addNewFile() {
+            const fileName = prompt("Enter file name (include .lua extension):");
+            if (fileName) {
+                const newFile = {
+                    name: fileName,
+                    content: '-- New Lua File\n'
+                };
+                openFiles.push(newFile);
+                updateFileExplorer();
+                updateEditorTabs();
+            }
+        }
+
+        function addNewFolder() {
+            const folderName = prompt("Enter folder name:");
+            if (folderName) {
+                alert('Folder creation is a placeholder feature');
+            }
+        }
+
+        function updateFileExplorer() {
+            const explorer = document.getElementById('file-explorer');
+            explorer.innerHTML = openFiles.map(file => `
+                <div class="file-item" onclick="selectFile(this)" data-filename="${file.name}">
+                    <span>📄 ${file.name}</span>
+                    <span class="file-item-actions">✕</span>
+                </div>
+            `).join('');
+        }
+
+        function updateEditorTabs() {
+            const tabContainer = document.getElementById('editor-tabs');
+            tabContainer.innerHTML = openFiles.map((file, index) => `
+                <div class="editor-tab ${index === 0 ? 'active' : ''}" onclick="switchTab(this)" data-filename="${file.name}">
+                    📄 ${file.name}
+                    <span class="editor-tab-close">✕</span>
+                </div>
+            `).join('');
+        }
+
+        // Improved Enter Key Handling
+        editor.commands.addCommand({
+            name: 'smartEnter',
+            bindKey: {win: 'Enter', mac: 'Enter'},
+            exec: function(editor) {
+                const session = editor.session;
+                const pos = editor.getCursorPosition();
+                const line = session.getLine(pos.row);
+                const trimmedLine = line.trim();
+
+                // Define auto-complete patterns with local function support
+                const autoCompletePatterns = [
+                    {
+                        start: /^local\s+function\s+\w+$/, 
+                        transform: (match) => match + '()', 
+                        end: 'end'
+                    },
+                    {
+                        start: /^function\s+\w+$/, 
+                        transform: (match) => match + '()', 
+                        end: 'end'
+                    },
+                    {
+                        start: /^if\s+.*\s+then\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    },
+                    {
+                        start: /^for\s+.*\s+do\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    },
+                    {
+                        start: /^while\s+.*\s+do\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    }
+                ];
+
+                // Detect current indentation
+                const currentIndent = line.match(/^\s*/)[0];
+                
+                // Check if line matches any special block
+                const matchedPattern = autoCompletePatterns.find(pattern => 
+                    new RegExp(pattern.start).test(trimmedLine)
+                );
+
+                if (matchedPattern) {
+                    // Transform line if needed (for function definitions)
+                    let processedLine = trimmedLine;
+                    if (matchedPattern.transform) {
+                        processedLine = matchedPattern.transform(trimmedLine);
+                        editor.navigateLineEnd();
+                        editor.insert('()');
+                    }
+
+                    // If it's a special block, insert new line with 'end'
+                    editor.insert('\n' + currentIndent + '    \n' + currentIndent + matchedPattern.end);
+                    editor.navigateUp(1);
+                    editor.navigateLineEnd();
+                } else {
+                    // Normal enter behavior
+                    editor.insert('\n' + currentIndent);
+                }
+            }
+        });
+
+        function selectFile(fileElement) {
+            const fileName = fileElement.dataset.filename;
+            const file = openFiles.find(f => f.name === fileName);
+            
+            // Update file explorer
+            document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+            fileElement.classList.add('active');
+            
+            // Update editor content
+            editor.setValue(file.content, -1);
+            
+            // Update tabs
+            document.querySelectorAll('.editor-tab').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.filename === fileName) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        function switchTab(tabElement) {
+            const fileName = tabElement.dataset.filename;
+            const file = openFiles.find(f => f.name === fileName);
+            
+            // Update tabs
+            document.querySelectorAll('.editor-tab').forEach(el => el.classList.remove('active'));
+            tabElement.classList.add('active');
+            
+            // Update editor content
+            editor.setValue(file.content, -1);
+            
+            // Update file explorer
+            document.querySelectorAll('.file-item').forEach(el => {
+                el.classList.remove('active');
+                if (el.dataset.filename === fileName) {
+                    el.classList.add('active');
+                }
+            });
+        }
+
+        // Initialize
+        updateFileExplorer();
+        updateEditorTabs();
+    </script>
+</body>
+</html>
