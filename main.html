@@ -167,8 +167,8 @@
             <div class="sidebar-header">
                 <span>Workspace</span>
                 <div class="sidebar-actions">
-                    <button class="button" style="padding: 2px 5px;" onclick="addNewFile()">+</button>
-                    <button class="button" style="padding: 2px 5px;" onclick="addNewFolder()">📁</button>
+                    <button class="button" style="padding: 2px 5px;" onclick="createNewFile()">+</button>
+                    <button class="button" style="padding: 2px 5px;" onclick="createNewFolder()">📁</button>
                 </div>
             </div>
             <div class="file-explorer" id="file-explorer">
@@ -360,6 +360,73 @@ end</div>
                 }
             });
         }
+
+        // Improved Enter Key Handling
+        editor.commands.addCommand({
+            name: 'smartEnter',
+            bindKey: {win: 'Enter', mac: 'Enter'},
+            exec: function(editor) {
+                const session = editor.session;
+                const pos = editor.getCursorPosition();
+                const line = session.getLine(pos.row);
+                const trimmedLine = line.trim();
+
+                // Define auto-complete patterns with local function support
+                const autoCompletePatterns = [
+                    {
+                        start: /^local\s+function\s+\w+$/, 
+                        transform: (match) => match + '()', 
+                        end: 'end'
+                    },
+                    {
+                        start: /^function\s+\w+$/, 
+                        transform: (match) => match + '()', 
+                        end: 'end'
+                    },
+                    {
+                        start: /^if\s+.*\s+then\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    },
+                    {
+                        start: /^for\s+.*\s+do\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    },
+                    {
+                        start: /^while\s+.*\s+do\s*$/, 
+                        transform: null, 
+                        end: 'end'
+                    }
+                ];
+
+                // Detect current indentation
+                const currentIndent = line.match(/^\s*/)[0];
+                
+                // Check if line matches any special block
+                const matchedPattern = autoCompletePatterns.find(pattern => 
+                    new RegExp(pattern.start).test(trimmedLine)
+                );
+
+                if (matchedPattern) {
+                    // Transform line if needed (for function definitions)
+                    let processedLine = trimmedLine;
+                    if (matchedPattern.transform) {
+                        processedLine = matchedPattern.transform(trimmedLine);
+                        editor.navigateLineEnd();
+                        editor.insert('()');
+                    }
+
+                    // If it's a special block, insert new line with 'end'
+                    editor.insert('\n' + currentIndent + '    \n' + currentIndent + matchedPattern.end);
+                    editor.navigateUp(1);
+                    editor.navigateLineEnd();
+                } else {
+                    // Normal enter behavior
+                    editor.insert('\n' + currentIndent);
+                }
+            }
+        });
 
         // Initialize
         updateFileExplorer();
